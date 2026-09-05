@@ -1,4 +1,4 @@
-"""Tests for the CapCheck image-analysis HTTP integration."""
+"""Tests for the image-forensic analysis HTTP integration."""
 
 from backend.api import routes
 from backend.main import app
@@ -11,24 +11,26 @@ PNG_BYTES = (
 )
 
 
-class StubDetector:
+class StubAnalyzer:
     def __init__(self, result: dict) -> None:
         self.result = result
         self.image_path = None
 
-    def detect(self, image_path):
+    def __call__(self, image_path):
         self.image_path = image_path
         return self.result
 
 
-def test_analyze_image_returns_capcheck_result_and_removes_upload(monkeypatch) -> None:
+def test_analyze_image_returns_orchestrator_result_and_removes_upload(monkeypatch) -> None:
     expected = {
-        "module": "ai_detector", "model": "capcheck/ai-human-generated-image-detection",
-        "status": "success", "label": "ai", "human_score": 0.1, "ai_score": 0.9,
-        "confidence": "high", "device": "cpu", "error": None,
+        "pipeline": "image_forensic_analysis", "status": "success",
+        "metadata": {"module": "metadata", "status": "success"},
+        "fingerprints": {"sha256": {}, "perceptual_hash": {}},
+        "ai_detection": {"module": "ai_detector", "status": "success"},
+        "manipulation": {"module": "manipulation", "status": "success"}, "errors": [],
     }
-    stub = StubDetector(expected)
-    monkeypatch.setattr(routes, "detector", stub)
+    stub = StubAnalyzer(expected)
+    monkeypatch.setattr(routes, "analyze_forensic_image", stub)
 
     response = TestClient(app).post(
         "/analyze/image", files={"image": ("sample.png", PNG_BYTES, "image/png")}
@@ -40,8 +42,8 @@ def test_analyze_image_returns_capcheck_result_and_removes_upload(monkeypatch) -
 
 
 def test_analyze_image_rejects_unsupported_upload(monkeypatch) -> None:
-    stub = StubDetector({})
-    monkeypatch.setattr(routes, "detector", stub)
+    stub = StubAnalyzer({})
+    monkeypatch.setattr(routes, "analyze_forensic_image", stub)
 
     response = TestClient(app).post(
         "/analyze/image", files={"image": ("sample.gif", b"GIF89a", "image/gif")}
@@ -52,13 +54,14 @@ def test_analyze_image_rejects_unsupported_upload(monkeypatch) -> None:
     assert stub.image_path is None
 
 
-def test_analyze_image_returns_detector_error_result(monkeypatch) -> None:
+def test_analyze_image_returns_orchestrator_error_result(monkeypatch) -> None:
     expected = {
-        "module": "ai_detector", "model": "capcheck/ai-human-generated-image-detection",
-        "status": "error", "label": None, "human_score": None, "ai_score": None,
-        "confidence": None, "device": "cpu", "error": "Model is not available.",
+        "pipeline": "image_forensic_analysis", "status": "partial",
+        "metadata": {}, "fingerprints": {"sha256": {}, "perceptual_hash": {}},
+        "ai_detection": {"module": "ai_detector", "status": "error", "error": "Model is not available."},
+        "manipulation": {}, "errors": [{"module": "ai_detection", "error": "Model is not available."}],
     }
-    monkeypatch.setattr(routes, "detector", StubDetector(expected))
+    monkeypatch.setattr(routes, "analyze_forensic_image", StubAnalyzer(expected))
 
     response = TestClient(app).post(
         "/analyze/image", files={"image": ("sample.png", PNG_BYTES, "image/png")}
@@ -68,12 +71,24 @@ def test_analyze_image_returns_detector_error_result(monkeypatch) -> None:
     assert response.json() == expected
 
 
-def test_analyze_image_handles_unexpected_detector_failure(monkeypatch) -> None:
-    class FailingDetector:
-        def detect(self, image_path):
-            raise RuntimeError("unavailable")
+def test_analyze_image_rejects_invalid_image_content(monkeypatch) -> None:
+    stub = StubAnalyzer({})
+    monkeypatch.setattr(routes, "analyze_forensic_image", stub)
 
-    monkeypatch.setattr(routes, "detector", FailingDetector())
+    response = TestClient(app).post(
+        "/analyze/image", files={"image": ("sample.png", b"not an image", "image/png")}
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Image analysis failed."}
+    assert stub.image_path is None
+
+
+def test_analyze_image_handles_unexpected_orchestration_failure(monkeypatch) -> None:
+    def fail(image_path):
+        raise RuntimeError("unavailable")
+
+    monkeypatch.setattr(routes, "analyze_forensic_image", fail)
 
     response = TestClient(app).post(
         "/analyze/image", files={"image": ("sample.png", PNG_BYTES, "image/png")}

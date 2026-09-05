@@ -5,10 +5,9 @@ from uuid import uuid4
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from PIL import Image
 
-from backend.detectors.ai_detector import CapCheckDetector
+from backend.core.image_analyzer import analyze_image as analyze_forensic_image
 
 router = APIRouter()
-detector = CapCheckDetector()
 UPLOAD_DIR = Path("data/uploads")
 
 SUPPORTED_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
@@ -35,7 +34,7 @@ async def analyze_image(image_file: UploadFile = File(..., alias="image")):
         with Image.open(upload_path) as image:
             image.verify()
 
-        result = detector.detect(upload_path)
+        result = analyze_forensic_image(upload_path)
         return result
 
     except HTTPException:
