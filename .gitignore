@@ -1,0 +1,36 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Test and tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Downloaded models and application caches
+models/
+model_cache/
+cache/
+.cache/
+
+# Generated analysis results
+results/
+outputs/
+generated_results/
+
+# Locally uploaded test and media files
+uploads/
+test_uploads/
+media/uploads/
