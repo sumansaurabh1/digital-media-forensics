@@ -22,6 +22,7 @@ class CapCheckDetector(AIImageDetector):
 
     MODULE_NAME = "ai_detector"
     MODEL_NAME = "capcheck/ai-human-generated-image-detection"
+    CHECKPOINT_PATH = Path(__file__).resolve().parents[3] / "models" / "capcheck-ntire-130k"
     LOCAL_FILES_ONLY = True
     SUPPORTED_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp"})
 
@@ -61,10 +62,10 @@ class CapCheckDetector(AIImageDetector):
     def _load_model(self) -> None:
         if self._model is None:
             self._processor = AutoImageProcessor.from_pretrained(
-                self.MODEL_NAME, local_files_only=self.LOCAL_FILES_ONLY
+                self.CHECKPOINT_PATH, local_files_only=self.LOCAL_FILES_ONLY
             )
             self._model = AutoModelForImageClassification.from_pretrained(
-                self.MODEL_NAME, local_files_only=self.LOCAL_FILES_ONLY
+                self.CHECKPOINT_PATH, local_files_only=self.LOCAL_FILES_ONLY
             ).to(self._device).eval()
 
     def _class_scores(self, probabilities: list[float]) -> tuple[float, float]:
