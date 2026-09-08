@@ -3,6 +3,7 @@
 from backend.api import routes
 from backend.main import app
 from fastapi.testclient import TestClient
+import json
 
 
 PNG_BYTES = (
@@ -21,6 +22,13 @@ class StubAnalyzer:
         return self.result
 
 
+def test_health_and_frontend_remain_available() -> None:
+    client = TestClient(app)
+
+    assert client.get("/health").json() == {"status": "healthy"}
+    assert "Digital Media Forensics" in client.get("/").text
+
+
 def test_analyze_image_returns_orchestrator_result_and_removes_upload(monkeypatch) -> None:
     expected = {
         "pipeline": "image_forensic_analysis", "status": "success",
@@ -29,7 +37,7 @@ def test_analyze_image_returns_orchestrator_result_and_removes_upload(monkeypatc
         "ai_detection": {"module": "ai_detector", "status": "success"},
         "manipulation": {"module": "manipulation", "status": "success"}, "errors": [],
     }
-    stub = StubAnalyzer(expected)
+    stub = StubAnalyzer(expected.copy())
     monkeypatch.setattr(routes, "analyze_forensic_image", stub)
 
     response = TestClient(app).post(
@@ -37,7 +45,10 @@ def test_analyze_image_returns_orchestrator_result_and_removes_upload(monkeypatc
     )
 
     assert response.status_code == 200
-    assert response.json() == expected
+    payload = response.json()
+    assert {key: payload[key] for key in expected} == expected
+    assert "evidence_report" in payload
+    json.dumps(payload["evidence_report"])
     assert stub.image_path is not None and not stub.image_path.exists()
 
 
@@ -61,14 +72,17 @@ def test_analyze_image_returns_orchestrator_error_result(monkeypatch) -> None:
         "ai_detection": {"module": "ai_detector", "status": "error", "error": "Model is not available."},
         "manipulation": {}, "errors": [{"module": "ai_detection", "error": "Model is not available."}],
     }
-    monkeypatch.setattr(routes, "analyze_forensic_image", StubAnalyzer(expected))
+    monkeypatch.setattr(routes, "analyze_forensic_image", StubAnalyzer(expected.copy()))
 
     response = TestClient(app).post(
         "/analyze/image", files={"image": ("sample.png", PNG_BYTES, "image/png")}
     )
 
     assert response.status_code == 200
-    assert response.json() == expected
+    payload = response.json()
+    assert {key: payload[key] for key in expected} == expected
+    assert "evidence_report" in payload
+    json.dumps(payload["evidence_report"])
 
 
 def test_analyze_image_rejects_invalid_image_content(monkeypatch) -> None:

@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="AI-powered digital media forensic investigation workbench">
+  <title>Digital Media Forensics</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+  <main class="shell">
+
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">DIGITAL MEDIA FORENSICS</p>
+        <h1>Image Investigation Workbench</h1>
+        <p class="intro">
+          Analyze available forensic signals, fingerprints, metadata, provenance,
+          traceability indicators, and supporting evidence from a submitted image.
+        </p>
+      </div>
+      <div class="disclaimer">
+        <strong>INVESTIGATIVE USE</strong>
+        <span>Results are forensic signals, not definitive authenticity or ownership verdicts.</span>
+      </div>
+    </header>
+
+    <section class="panel upload-panel" aria-labelledby="upload-title">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">CASE INPUT</p>
+          <h2 id="upload-title">Submit evidence image</h2>
+        </div>
+        <span class="status-dot">READY</span>
+      </div>
+
+      <label id="drop-zone" class="drop-zone" for="image">
+        <input id="image" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+        <span class="upload-icon" aria-hidden="true">+</span>
+        <strong>Drop image here or select a file</strong>
+        <span>PNG, JPG, JPEG, or WEBP</span>
+      </label>
+
+      <div id="preview-wrap" class="preview-wrap" hidden>
+        <img id="preview" alt="Selected evidence image preview">
+        <div>
+          <p class="file-label">SELECTED FILE</p>
+          <p id="file-name">Not available</p>
+        </div>
+      </div>
+
+      <div class="upload-actions">
+        <button id="analyze" type="button" disabled>Analyze Image</button>
+        <p id="state" class="state" aria-live="polite">Select an image to begin.</p>
+      </div>
+    </section>
+
+    <section id="results" hidden>
+
+      <section class="workflow panel" aria-labelledby="workflow-title">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">INVESTIGATION WORKFLOW</p>
+            <h2 id="workflow-title">Analysis pipeline</h2>
+          </div>
+        </div>
+
+        <ol class="workflow-list">
+          <li class="active">Input</li>
+          <li>AI Detection</li>
+          <li>Manipulation</li>
+          <li>Metadata</li>
+          <li>Provenance</li>
+          <li>Fingerprints</li>
+          <li>Traceability</li>
+          <li>Evidence</li>
+        </ol>
+      </section>
+
+      <section aria-labelledby="overview-title">
+        <div class="section-title">
+          <p class="section-kicker">INVESTIGATION OVERVIEW</p>
+          <h2 id="overview-title">Case status</h2>
+        </div>
+        <div id="summary" class="summary"></div>
+      </section>
+
+      <section aria-labelledby="findings-title">
+        <div class="section-title">
+          <p class="section-kicker">FORENSIC FINDINGS</p>
+          <h2 id="findings-title">Available analysis signals</h2>
+        </div>
+
+        <div class="dashboard-grid">
+
+          <article class="panel finding">
+            <div class="card-heading">
+              <div>
+                <span class="card-index">01</span>
+                <h3>AI Detection</h3>
+              </div>
+              <span class="card-tag">MODEL SIGNAL</span>
+            </div>
+
+            <div id="ai-findings" class="metrics"></div>
+
+            <p class="caution">
+              AI detection is one forensic signal and is not, by itself,
+              a definitive authenticity determination.
+            </p>
+          </article>
+
+          <article class="panel finding">
+            <div class="card-heading">
+              <div>
+                <span class="card-index">02</span>
+                <h3>Manipulation Analysis</h3>
+              </div>
+              <span class="card-tag">SIGNAL ANALYSIS</span>
+            </div>
+
+            <div id="manipulation-findings" class="metrics"></div>
+            <div id="component-signals" class="signal-grid"></div>
+
+            <p class="caution">
+              Signal-based analysis identifies image-level inconsistencies
+              that may warrant further examination. It does not establish
+              that an image was definitively edited.
+            </p>
+          </article>
+
+          <article class="panel finding">
+            <div class="card-heading">
+              <div>
+                <span class="card-index">03</span>
+                <h3>Suspicious Regions</h3>
+              </div>
+              <span class="card-tag">REVIEW AREAS</span>
+            </div>
+
+            <div id="region-findings" class="metrics single"></div>
+
+            <p class="caution">
+              Flagged regions indicate areas identified by signal-based
+              analysis and do not establish manipulation.
+            </p>
+          </article>
+
+          <article class="panel finding">
+            <div class="card-heading">
+              <div>
+                <span class="card-index">04</span>
+                <h3>Image &amp; Metadata</h3>
+              </div>
+              <span class="card-tag">FILE CONTEXT</span>
+            </div>
+
+            <div id="metadata-findings" class="metrics"></div>
+            <p id="metadata-note" class="caution"></p>
+          </article>
+
+          <article class="panel finding">
+            <div class="card-heading">
+              <div>
+                <span class="card-index">05</span>
+                <h3>Provenance &amp; C2PA</h3>
+              </div>
+              <span class="card-tag">PROVENANCE</span>
+            </div>
+
+            <div id="provenance-findings" class="metrics"></div>
+            <div id="provenance-validation" class="signal-grid"></div>
+
+            <p id="provenance-note" class="caution"></p>
+          </article>
+
+        </div>
+      </section>
+
+      <section aria-labelledby="fingerprints-title">
+        <div class="section-title">
+          <p class="section-kicker">DIGITAL FINGERPRINTS</p>
+          <h2 id="fingerprints-title">File identification</h2>
+        </div>
+
+        <div class="dashboard-grid fingerprint-grid">
+
+          <article class="panel finding">
+            <div class="card-heading">
+              <div>
+                <span class="card-index">06</span>
+                <h3>SHA-256</h3>
+              </div>
+              <span class="card-tag">EXACT FILE</span>
+            </div>
+
+            <code id="sha-value">Not available</code>
+            <button class="copy" data-copy="sha-value" type="button">Copy hash</button>
+
+            <p class="caution">
+              Identifies these exact file bytes, not visually similar images.
+            </p>
+          </article>
+
+          <article class="panel finding">
+            <div class="card-heading">
+              <div>
+                <span class="card-index">07</span>
+                <h3>Perceptual Hash</h3>
+              </div>
+              <span class="card-tag">VISUAL AID</span>
+            </div>
+
+            <code id="phash-value">Not available</code>
+            <button class="copy" data-copy="phash-value" type="button">Copy hash</button>
+
+            <p class="caution">
+              Supports visual-similarity comparisons; it is not proof of
+              a shared original source.
+            </p>
+          </article>
+
+        </div>
+
+        <p id="copy-state" class="copy-state" aria-live="polite"></p>
+      </section>
+
+      <section class="panel traceability" aria-labelledby="trace-title">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">WEB TRACEABILITY &amp; SOURCE DISCOVERY</p>
+            <h2 id="trace-title">Available web indicators</h2>
+          </div>
+          <span class="card-tag">DISCOVERY</span>
+        </div>
+
+        <div id="traceability-findings"></div>
+
+        <p class="caution">
+          Source/timeline was not established by the available analysis.
+        </p>
+      </section>
+
+      <section class="panel evidence" aria-labelledby="evidence-title">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">EVIDENCE ASSESSMENT</p>
+            <h2 id="evidence-title">Investigation report</h2>
+          </div>
+          <span class="card-tag">EVIDENCE</span>
+        </div>
+
+        <div class="assessment">
+          <span class="assessment-label">OVERALL ASSESSMENT</span>
+          <p id="overall-assessment">Not available</p>
+        </div>
+
+        <div id="evidence-findings" class="evidence-grid"></div>
+      </section>
+
+      <section class="technical" aria-labelledby="technical-title">
+        <div class="section-title">
+          <p class="section-kicker">TECHNICAL DETAILS</p>
+          <h2 id="technical-title">Raw module responses</h2>
+          <p class="technical-intro">
+            Expand a section when detailed detector output is required for technical review.
+          </p>
+        </div>
+
+        <div id="details"></div>
+      </section>
+
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

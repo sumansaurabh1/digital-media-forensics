@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 
 from backend.detectors.ai_detector import AIImageDetector, CapCheckDetector
+from backend.detectors.ai_detector import capcheck_detector
 
 
 RESULT_KEYS = {
@@ -48,3 +49,30 @@ def test_class_scores_follow_configured_label_ids() -> None:
 
     assert human_score == 0.8
     assert ai_score == 0.2
+
+
+def test_model_loading_uses_local_ntire_checkpoint_and_remains_lazy(monkeypatch) -> None:
+    calls = []
+
+    class Processor:
+        @staticmethod
+        def from_pretrained(path, **kwargs):
+            calls.append(("processor", path, kwargs))
+            return object()
+
+    class Model:
+        @staticmethod
+        def from_pretrained(path, **kwargs):
+            calls.append(("model", path, kwargs))
+            return SimpleNamespace(to=lambda device: SimpleNamespace(eval=lambda: object()))
+
+    monkeypatch.setattr(capcheck_detector, "AutoImageProcessor", Processor)
+    monkeypatch.setattr(capcheck_detector, "AutoModelForImageClassification", Model)
+    detector = CapCheckDetector()
+
+    assert calls == []
+    detector._load_model()
+
+    assert [call[0] for call in calls] == ["processor", "model"]
+    assert all(call[1] == CapCheckDetector.CHECKPOINT_PATH for call in calls)
+    assert all(call[2] == {"local_files_only": True} for call in calls)

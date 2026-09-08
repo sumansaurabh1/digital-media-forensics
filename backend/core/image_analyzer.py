@@ -1,3 +1,4 @@
+
 """Orchestrate existing image-forensic modules without interpreting their results."""
 
 from __future__ import annotations
@@ -11,8 +12,10 @@ from backend.core.schemas import ForensicResult
 from backend.detectors.ai_detector.capcheck_detector import CapCheckDetector
 from backend.detectors.manipulation.analyzer import analyze as manipulation_analyze
 from backend.detectors.metadata.analyzer import analyze as metadata_analyze
+from backend.detectors.provenance.analyzer import analyze as provenance_analyze
 from backend.fingerprint.perceptual import calculate_phash
 from backend.fingerprint.sha256 import calculate_sha256
+from backend.traceability.google_vision import detect_web
 
 _ai_detector: CapCheckDetector | None = None
 
@@ -23,35 +26,47 @@ def analyze_image(image_path: str | Path) -> dict[str, Any]:
     invalid = _validation_error(path)
     if invalid:
         return {
-            "pipeline": "image_forensic_analysis", "status": "failure",
-            "metadata": None, "fingerprints": {"sha256": None, "perceptual_hash": None},
-            "ai_detection": None, "manipulation": None,
+            "pipeline": "image_forensic_analysis",
+            "status": "failure",
+            "metadata": None,
+            "fingerprints": {"sha256": None, "perceptual_hash": None},
+            "traceability": None,
+            "ai_detection": None,
+            "manipulation": None,
+            "provenance": None,
             "errors": [{"module": "input_validation", "error": invalid}],
         }
 
     errors: list[dict[str, str]] = []
-    def run(name: str, stage: Callable[[Path], Any]) -> Any:
+
+    def run(name: str, stage: Callable[[Path], Any], exception_error: str | None = None) -> Any:
         try:
             result = _json_result(stage(path))
             if result.get("status") == "error":
                 errors.append({"module": name, "error": str(result.get("error") or "Stage failed")})
             return result
         except Exception as exc:
-            errors.append({"module": name, "error": str(exc)})
-            return _json_result(ForensicResult(module=name, status="error", error=str(exc)))
+            error = exception_error or str(exc)
+            errors.append({"module": name, "error": error})
+            return _json_result(ForensicResult(module=name, status="error", error=error))
 
     metadata = run("metadata", metadata_analyze)
     sha256 = run("sha256", calculate_sha256)
     perceptual_hash = run("perceptual_hash", calculate_phash)
+    traceability = run("traceability", detect_web, "Traceability request failed.")
     ai_detection = run("ai_detection", lambda value: _get_ai_detector().detect(value))
     manipulation = run("manipulation", manipulation_analyze)
+    provenance = run("provenance", provenance_analyze)
+
     return {
         "pipeline": "image_forensic_analysis",
         "status": "partial" if errors else "success",
         "metadata": metadata,
         "fingerprints": {"sha256": sha256, "perceptual_hash": perceptual_hash},
+        "traceability": traceability,
         "ai_detection": ai_detection,
         "manipulation": manipulation,
+        "provenance": provenance,
         "errors": errors,
     }
 

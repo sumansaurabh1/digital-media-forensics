@@ -194,10 +194,26 @@ def resolve_class_mapping(model: Any) -> dict[int, int]:
 
 def load_capcheck_training_components() -> tuple[Any, Any, dict[int, int]]:
     """Load the existing CapCheck architecture and processor from local cache only."""
-    name = CapCheckDetector.MODEL_NAME
+    name = CapCheckDetector.CHECKPOINT_PATH
     processor = AutoImageProcessor.from_pretrained(name, local_files_only=True)
     model = AutoModelForImageClassification.from_pretrained(name, local_files_only=True)
     return processor, model, resolve_class_mapping(model)
+
+
+def _classification_head_parameters(model: Any) -> tuple[nn.Parameter, ...]:
+    """Find the model's final prediction projection from its configured label count."""
+    num_labels = getattr(getattr(model, "config", None), "num_labels", None)
+    if not isinstance(num_labels, int) or num_labels <= 0:
+        raise ValueError("Model has no valid num_labels configuration.")
+
+    candidates: list[tuple[nn.Parameter, ...]] = []
+    for module in model.modules():
+        parameters = tuple(module.parameters(recurse=False))
+        if parameters and any(parameter.ndim and parameter.shape[0] == num_labels for parameter in parameters):
+            candidates.append(parameters)
+    if len(candidates) != 1:
+        raise ValueError("Could not uniquely identify the model's final classification head.")
+    return candidates[0]
 
 
 @dataclass(frozen=True)
@@ -219,8 +235,13 @@ def fine_tune_ntire(
         raise ValueError("epochs, batch_size, and learning_rate must be positive.")
     if set(class_mapping) != {0, 1}:
         raise ValueError("Class mapping must contain NTIRE labels 0 and 1.")
+    if not torch.cuda.is_available():
+        raise RuntimeError("CUDA is required for CapCheck NTIRE training.")
+    checkpoint_dir = Path(config.checkpoint_dir)
+    if checkpoint_dir.resolve() == Path("models/capcheck-ntire-full").resolve():
+        raise ValueError("The full NTIRE checkpoint must not be overwritten.")
     torch.manual_seed(config.seed)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda")
     train_set, validation_set = split_ntire_dataset(dataset, config.validation_ratio, config.seed)
     collate = partial(collate_images, processor=processor)
     generator = torch.Generator().manual_seed(config.seed)
@@ -229,7 +250,12 @@ def fine_tune_ntire(
     validation_loader = DataLoader(validation_set, batch_size=config.batch_size, shuffle=False,
                                    num_workers=config.num_workers, collate_fn=collate, pin_memory=device.type == "cuda")
     model.to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
+    for parameter in model.parameters():
+        parameter.requires_grad = False
+    head_parameters = _classification_head_parameters(model)
+    for parameter in head_parameters:
+        parameter.requires_grad = True
+    optimizer = torch.optim.AdamW(head_parameters, lr=config.learning_rate)
     history: list[dict[str, float]] = []
     inverse_mapping = {model_label: ntire_label for ntire_label, model_label in class_mapping.items()}
 
@@ -249,7 +275,6 @@ def fine_tune_ntire(
         validation = _validate(model, validation_loader, class_mapping, inverse_mapping, device)
         history.append({"epoch": float(epoch), "train_loss": train_loss / train_count, **validation})
 
-    checkpoint_dir = Path(config.checkpoint_dir)
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(checkpoint_dir)
     processor.save_pretrained(checkpoint_dir)
@@ -302,3 +327,9 @@ def reload_checkpoint(checkpoint_dir: str | Path) -> dict[int, int]:
     with torch.inference_mode():
         model(**inputs).logits
     return mapping
+
+if __name__ == '__main__':
+    dataset = NTIREZipDataset(r'D:\ai-forensics-datasets\NTIRE-2026', max_samples=20000)
+    processor, model, mapping = load_capcheck_training_components()
+    config = TrainingConfig(epochs=1, batch_size=32, learning_rate=1e-4, checkpoint_dir=Path('models/capcheck-fast'))
+    print(f'Training on {len(dataset)} images with CUDA'); print(fine_tune_ntire(dataset, processor, model, mapping, config)['metadata']['validation_metrics'])
