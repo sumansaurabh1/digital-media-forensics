@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import joblib
+import numpy as np
 import statistics
 import subprocess
 import tempfile
@@ -14,6 +16,8 @@ from backend.detectors.ai_detector.capcheck_detector import CapCheckDetector
 
 SUPPORTED_VIDEO_SUFFIXES = frozenset({".mp4", ".mov", ".avi", ".webm"})
 _detector: CapCheckDetector | None = None
+_video_model = None
+_VIDEO_MODEL_PATH = Path("models/video-baseline/best.joblib")
 
 
 def is_supported_video(path: str | Path) -> bool:
@@ -32,7 +36,13 @@ def temporal_features(scores: list[float]) -> list[float]:
     mean = statistics.fmean(scores)
     median = statistics.median(scores)
     low, high = min(scores), max(scores)
-    return [mean, median, statistics.pstdev(scores), low, high, high - low, scores[-1] - scores[0]]
+    diffs = [abs(b - a) for a, b in zip(scores, scores[1:])]
+    mid = max(1, len(scores) // 2)
+    q = statistics.quantiles(scores, n=100, method="inclusive") if len(scores) > 1 else [scores[0]] * 99
+    return [mean, median, statistics.pstdev(scores), low, high, high - low,
+            scores[-1] - scores[0], q[9], q[24], q[74], q[89],
+            statistics.fmean(diffs) if diffs else 0.0, max(diffs, default=0.0),
+            statistics.fmean(scores[:mid]), statistics.fmean(scores[mid:])]
 
 
 def probe_video(path: str | Path) -> dict[str, Any]:
@@ -85,12 +95,22 @@ def analyze_video(video_path: str | Path, frames: int = 12, detector: CapCheckDe
         base["status"] = "failure"
         return base
     features = temporal_features(scores)
-    ai_score = features[0]
-    base.update(ai_score=ai_score, human_score=1 - ai_score,
-                frame_statistics=dict(zip(("mean", "median", "std", "min", "max", "range", "early_late_difference"), features)),
-                label="likely_ai" if ai_score >= .70 else "likely_human" if ai_score <= .30 else "inconclusive",
-                confidence="high" if ai_score >= .85 or ai_score <= .15 else "medium" if ai_score >= .70 or ai_score <= .30 else "low",
-                status="partial" if base["failed_frames"] else "success")
+    model_state = joblib.load(_VIDEO_MODEL_PATH)
+    video_model = model_state["model"]
+    ai_score = float(video_model.predict_proba(np.asarray([features]))[0, 1])
+    base.update(
+        ai_score=ai_score,
+        human_score=1 - ai_score,
+        frame_statistics=dict(zip(
+            ("mean", "median", "std", "min", "max", "range", "early_late_difference",
+             "p10", "p25", "p75", "p90", "mean_abs_diff", "max_abs_diff",
+             "first_half_mean", "second_half_mean"),
+            features
+        )),
+        label="likely_ai" if ai_score >= .70 else "likely_human" if ai_score <= .30 else "inconclusive",
+        confidence="high" if ai_score >= .85 or ai_score <= .15 else "medium" if ai_score >= .70 or ai_score <= .30 else "low",
+        status="partial" if base["failed_frames"] else "success"
+    )
     return base
 
 

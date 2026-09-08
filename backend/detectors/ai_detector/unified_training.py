@@ -1,66 +1,43 @@
+@'
 from pathlib import Path
-import io, glob, json
-import pyarrow.parquet as pq
 import torch
 from PIL import Image
-from torch import nn
 from transformers import AutoImageProcessor, AutoModelForImageClassification
-from backend.detectors.ai_detector.training import resolve_class_mapping
 
-ROOT = Path(r"D:\ai-forensics-datasets\Modern-AI-Real\data")
-BASE = Path("models/capcheck-ntire-full")
-OUT = Path("models/capcheck-unified")
+MODELS = [
+    "models/capcheck-ntire-full",
+    "models/capcheck-unified",
+    "models/capcheck-unified-morph",
+]
 
-processor = AutoImageProcessor.from_pretrained(BASE, local_files_only=True)
-model = AutoModelForImageClassification.from_pretrained(BASE, local_files_only=True)
-mapping = resolve_class_mapping(model)
-device = torch.device("cuda")
-model.to(device)
+IMAGES = [
+    r"C:\Users\suman\Downloads\ChatGPT Image Sep 7, 2026, 11_22_22 AM.png",
+    r"C:\Users\suman\OneDrive\Desktop\ChatGPT Image Sep 7, 2026, 01_06_20 AM.png",
+    r"C:\Users\suman\OneDrive\Desktop\19b4526c-1d0d-4c2d-81fb-bcf098ba4ee7.png",
+]
 
-for p in model.parameters():
-    p.requires_grad = False
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-head = []
-for m in model.modules():
-    ps = tuple(m.parameters(recurse=False))
-    if ps and any(p.ndim > 0 and p.shape[0] == model.config.num_labels for p in ps):
-        head.extend(ps)
+for model_path in MODELS:
+    if not Path(model_path).exists():
+        print(f"\nSKIP: {model_path}")
+        continue
 
-head = tuple(dict.fromkeys(head))
-for p in head:
-    p.requires_grad = True
+    processor = AutoImageProcessor.from_pretrained(model_path, local_files_only=True)
+    model = AutoModelForImageClassification.from_pretrained(model_path, local_files_only=True).to(device)
+    model.eval()
 
-optimizer = torch.optim.AdamW(head, lr=1e-4)
-files = sorted(glob.glob(str(ROOT / "train-*.parquet")))
-total = 0
-model.train()
+    print(f"\n=== {model_path} ===")
 
-for shard, file in enumerate(files, 1):
-    pf = pq.ParquetFile(file)
-    for table in pf.iter_batches(batch_size=32, columns=["image", "label"]):
-        rows = table.to_pylist()
-        images = [Image.open(io.BytesIO(r["image"]["bytes"])).convert("RGB") for r in rows]
-        labels = torch.tensor([mapping[1 - int(r["label"])] for r in rows], device=device)
-
-        x = processor(images=images, return_tensors="pt")
+    for image_path in IMAGES:
+        image = Image.open(image_path).convert("RGB")
+        x = processor(images=image, return_tensors="pt")
         x = {k: v.to(device) for k, v in x.items()}
-        optimizer.zero_grad()
-        loss = nn.functional.cross_entropy(model(**x).logits, labels)
-        loss.backward()
-        optimizer.step()
 
-        total += len(rows)
-        if total % 500 < 32:
-            print(f"{total}/10695 | shard {shard}/{len(files)} | loss={loss.item():.4f}", flush=True)
+        with torch.inference_mode():
+            probs = torch.softmax(model(**x).logits, dim=-1)[0]
 
-OUT.mkdir(parents=True, exist_ok=True)
-model.save_pretrained(OUT)
-processor.save_pretrained(OUT)
-(OUT / "training_metadata.json").write_text(json.dumps({
-    "dataset": "Modern-AI-Real",
-    "images": total,
-    "base_model": str(BASE),
-    "label_mapping": mapping,
-    "device": torch.cuda.get_device_name(0)
-}, indent=2))
-print(f"DONE: {total} images -> {OUT}", flush=True)
+        labels = model.config.id2label
+        scores = {labels[i]: round(float(probs[i]), 4) for i in range(len(probs))}
+        print(Path(image_path).name, scores)
+'@ | Set-Content eval_models.py

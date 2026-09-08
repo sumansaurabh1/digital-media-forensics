@@ -1,15 +1,23 @@
-"""FastAPI application entry point for the digital media forensics backend."""
-
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.routes import router
 
+app = FastAPI(title="Digital Media Forensics")
 
-app = FastAPI(
-    title="Digital Media Forensics API",
-    version="0.1.0",
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(router)
-app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
+
+@app.get("/")
+def root():
+    return {"status": "running", "service": "digital-media-forensics"}
