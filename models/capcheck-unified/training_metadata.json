@@ -1,0 +1,10 @@
+{
+  "dataset": "Modern-AI-Real",
+  "images": 10695,
+  "base_model": "models\\capcheck-ntire-full",
+  "label_mapping": {
+    "0": 0,
+    "1": 1
+  },
+  "device": "NVIDIA GeForce RTX 5060 Laptop GPU"
+}

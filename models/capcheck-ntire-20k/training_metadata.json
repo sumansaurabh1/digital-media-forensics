@@ -1,0 +1,27 @@
+{
+  "base_model": "capcheck/ai-human-generated-image-detection",
+  "epoch": 1,
+  "validation_metrics": {
+    "epoch": 1.0,
+    "train_loss": 0.23069501430355013,
+    "validation_loss": 0.19988376727700233,
+    "accuracy": 0.922,
+    "precision": 0.9327146171693735,
+    "recall": 0.9458823529411765,
+    "f1": 0.9392523364485982
+  },
+  "class_mapping": {
+    "0": 0,
+    "1": 1
+  },
+  "training_configuration": {
+    "epochs": 1,
+    "batch_size": 8,
+    "learning_rate": 1e-05,
+    "validation_ratio": 0.2,
+    "seed": 1,
+    "num_workers": 0,
+    "checkpoint_dir": "E:\\digital-media-forensics\\models\\capcheck-ntire-20k"
+  },
+  "seed": 1
+}

@@ -1,0 +1,89 @@
+{
+  "dataset_paths": {
+    "morph": "D:\\ai-forensics-datasets\\DiM-FRLL-Morphs\\morphs",
+    "bona_fide": "D:\\ai-forensics-datasets\\FRLL\\neutral_front"
+  },
+  "class_mapping": {
+    "0": "bona_fide",
+    "1": "morph"
+  },
+  "class_counts": {
+    "bona_fide": 102,
+    "morph": 3000,
+    "morph_generation_groups": {
+      "dim_a": 500,
+      "dim_c": 500,
+      "fast_dim": 500,
+      "fast_dim_ode": 500,
+      "greedy_dim": 500,
+      "greedy_dim_s": 500
+    }
+  },
+  "train_counts": {
+    "bona_fide": 82,
+    "morph": 2400
+  },
+  "validation_counts": {
+    "bona_fide": 20,
+    "morph": 600
+  },
+  "seed": 0,
+  "device": "cuda",
+  "model_backbone": "models\\capcheck-unified",
+  "frozen_backbone": true,
+  "training_configuration": {
+    "seed": 0,
+    "epochs": 5,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "validation_ratio": 0.2,
+    "num_workers": 0
+  },
+  "validation_metrics": {
+    "train_loss": 0.08420224946278793,
+    "validation_loss": 0.06301312306895852,
+    "accuracy": 0.9967741935483871,
+    "precision": 1.0,
+    "recall": 0.9966666666666667,
+    "f1": 0.998330550918197,
+    "confusion_matrix": [
+      [
+        20,
+        0
+      ],
+      [
+        2,
+        598
+      ]
+    ],
+    "per_class": {
+      "bona_fide": {
+        "precision": 0.9090909090909091,
+        "recall": 1.0,
+        "f1-score": 0.9523809523809523,
+        "support": 20.0
+      },
+      "morph": {
+        "precision": 1.0,
+        "recall": 0.9966666666666667,
+        "f1-score": 0.998330550918197,
+        "support": 600.0
+      },
+      "accuracy": 0.9967741935483871,
+      "macro avg": {
+        "precision": 0.9545454545454546,
+        "recall": 0.9983333333333333,
+        "f1-score": 0.9753557516495747,
+        "support": 620.0
+      },
+      "weighted avg": {
+        "precision": 0.9970674486803518,
+        "recall": 0.9967741935483871,
+        "f1-score": 0.9968483058040923,
+        "support": 620.0
+      }
+    }
+  },
+  "best_epoch": 3,
+  "checkpoint_path": "models\\morph-detector-v2"
+}

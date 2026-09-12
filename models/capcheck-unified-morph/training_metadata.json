@@ -1,0 +1,7 @@
+{
+  "dataset": "DiM-FRLL-Morphs",
+  "morph_images": 3000,
+  "real_images_used": 3000,
+  "base_model": "models\\capcheck-unified",
+  "device": "NVIDIA GeForce RTX 5060 Laptop GPU"
+}
